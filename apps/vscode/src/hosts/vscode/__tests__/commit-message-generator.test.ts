@@ -65,6 +65,32 @@ describe("commit-message-generator", () => {
 			inputBox.value.should.equal("")
 		})
 
+		it("cancels a running generation when a new one starts", async () => {
+			const firstRules = deferred<string>()
+			const firstCreateMessage = sinon.stub().callsFake(() => textStream("feat: first"))
+			const secondCreateMessage = sinon.stub().callsFake(() => textStream("feat: second"))
+			buildApiHandlerStub.onFirstCall().returns({ createMessage: firstCreateMessage })
+			buildApiHandlerStub.onSecondCall().returns({ createMessage: secondCreateMessage })
+			const inputBox = { value: "" }
+
+			const first = performCommitMsgGeneration(
+				fakeController(() => firstRules.promise),
+				"diff",
+				inputBox,
+			)
+			await performCommitMsgGeneration(
+				fakeController(async () => ""),
+				"diff",
+				inputBox,
+			)
+			firstRules.resolve("")
+			await first
+
+			firstCreateMessage.called.should.be.false()
+			secondCreateMessage.calledOnce.should.be.true()
+			inputBox.value.should.equal("feat: second")
+		})
+
 		it("sends the request when not cancelled", async () => {
 			const createMessage = sinon.stub().callsFake(() => textStream("feat: x"))
 			buildApiHandlerStub.returns({ createMessage })
